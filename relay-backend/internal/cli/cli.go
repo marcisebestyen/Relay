@@ -91,7 +91,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		},
 	})
 
-	root.AddCommand(newMigrateCmd(&cfg))
+	root.AddCommand(newMigrateCmd(&cfg), newAPICmd(&cfg, &logger))
 
 	return root
 }

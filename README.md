@@ -28,6 +28,20 @@ make migrate-down     # roll back one migration
 make migrate-status   # list migrations and their state
 ```
 
+## API server
+
+```sh
+cd relay-backend && go run ./cmd/relay api   # listens on RELAY_HTTP_ADDR (default :8080)
+```
+
+| Route | Response |
+|---|---|
+| `GET /health` | `200 {"status":"ok"}` (process only, no DB) |
+| `GET /ready` | `200 {"status":"ready"}`, or `503` error envelope with `details.failed` when the database ping fails |
+
+Errors use `{"error": {"code", "message", "details"}}`. Every response has an `X-Request-ID` header.
+SIGINT/SIGTERM drains in-flight requests for up to `RELAY_SHUTDOWN_TIMEOUT`.
+
 ## Tests
 
 ```sh
