@@ -55,6 +55,7 @@ type BuildInfo struct {
 func NewRootCmd(info BuildInfo) *cobra.Command {
 	var logLevel string
 	var logger *slog.Logger
+	var cfg config.Config
 
 	root := &cobra.Command{
 		Use:           "relay",
@@ -62,8 +63,8 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(cmd)
-			if err != nil {
+			var err error
+			if cfg, err = loadConfig(cmd); err != nil {
 				return err
 			}
 			if !cmd.Root().PersistentFlags().Changed(logLevelFlag) {
@@ -89,6 +90,8 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 			return err
 		},
 	})
+
+	root.AddCommand(newMigrateCmd(&cfg))
 
 	return root
 }
