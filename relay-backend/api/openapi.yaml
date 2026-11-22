@@ -29,6 +29,11 @@ paths:
       responses:
         '201':
           description: Job created.
+          headers:
+            Location:
+              description: Path of the new job.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -37,6 +42,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '500':
@@ -225,6 +232,12 @@ components:
             $ref: '#/components/schemas/Error'
     Unauthorized:
       description: Missing or wrong bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    PayloadTooLarge:
+      description: Request body is larger than `RELAY_MAX_PAYLOAD_BYTES`.
       content:
         application/json:
           schema:
@@ -431,6 +444,7 @@ components:
               type: string
               enum:
                 - bad_request
+                - payload_too_large
                 - validation_failed
                 - not_found
                 - method_not_allowed

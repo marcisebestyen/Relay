@@ -51,6 +51,7 @@ const (
 	ErrorErrorCodeInternal         ErrorErrorCode = "internal"
 	ErrorErrorCodeMethodNotAllowed ErrorErrorCode = "method_not_allowed"
 	ErrorErrorCodeNotFound         ErrorErrorCode = "not_found"
+	ErrorErrorCodePayloadTooLarge  ErrorErrorCode = "payload_too_large"
 	ErrorErrorCodeUnauthorized     ErrorErrorCode = "unauthorized"
 	ErrorErrorCodeUnavailable      ErrorErrorCode = "unavailable"
 	ErrorErrorCodeValidationFailed ErrorErrorCode = "validation_failed"
@@ -68,6 +69,8 @@ func (e ErrorErrorCode) Valid() bool {
 	case ErrorErrorCodeMethodNotAllowed:
 		return true
 	case ErrorErrorCodeNotFound:
+		return true
+	case ErrorErrorCodePayloadTooLarge:
 		return true
 	case ErrorErrorCodeUnauthorized:
 		return true
@@ -227,6 +230,9 @@ type Internal = Error
 
 // NotFound defines model for NotFound.
 type NotFound = Error
+
+// PayloadTooLarge defines model for PayloadTooLarge.
+type PayloadTooLarge = Error
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
