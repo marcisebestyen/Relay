@@ -81,6 +81,19 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (domain.Job, error) {
 	return jobsrepo.GetByID(ctx, s.pool, id)
 }
 
+// List returns one page of jobs without payloads. An invalid filter returns
+// domain.ValidationErrors and touches no database.
+func (s *Service) List(ctx context.Context, f domain.JobFilter) (domain.JobPage, error) {
+	if err := f.Validate(); err != nil {
+		return domain.JobPage{}, err
+	}
+	page, err := jobsrepo.List(ctx, s.pool, f)
+	if err != nil {
+		return domain.JobPage{}, fmt.Errorf("list jobs: %w", err)
+	}
+	return page, nil
+}
+
 // normalizePayload turns an empty payload into {} (the column is NOT NULL)
 // and reports a payload that is not valid JSON.
 func normalizePayload(in *domain.NewJobInput) error {

@@ -27,13 +27,12 @@ func newJobInput(b createJobBody) domain.NewJobInput {
 	return in
 }
 
-// toJobDTO maps a domain job to the response shape. Times are UTC and an
-// empty name is left out.
-func toJobDTO(j domain.Job) gen.Job {
-	dto := gen.Job{
+// toJobSummaryDTO maps a domain job to the list item shape: no payload. Times
+// are UTC and an empty name is left out.
+func toJobSummaryDTO(j domain.Job) gen.JobSummary {
+	dto := gen.JobSummary{
 		Id:             j.ID,
 		Handler:        j.Handler,
-		Payload:        j.Payload,
 		Queue:          j.Queue,
 		Status:         gen.JobStatus(j.Status),
 		Priority:       j.Priority,
@@ -53,4 +52,25 @@ func toJobDTO(j domain.Job) gen.Job {
 		dto.CompletedAt = &t
 	}
 	return dto
+}
+
+// toJobDTO maps a domain job to the detail shape: the summary plus the payload.
+func toJobDTO(j domain.Job) gen.Job {
+	s := toJobSummaryDTO(j)
+	return gen.Job{
+		Id:             s.Id,
+		Name:           s.Name,
+		Handler:        s.Handler,
+		Payload:        j.Payload,
+		Queue:          s.Queue,
+		Status:         s.Status,
+		Priority:       s.Priority,
+		ScheduledAt:    s.ScheduledAt,
+		MaxAttempts:    s.MaxAttempts,
+		TimeoutSeconds: s.TimeoutSeconds,
+		CreatedAt:      s.CreatedAt,
+		UpdatedAt:      s.UpdatedAt,
+		CompletedAt:    s.CompletedAt,
+		LastError:      s.LastError,
+	}
 }

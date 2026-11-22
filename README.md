@@ -40,6 +40,7 @@ cd relay-backend && go run ./cmd/relay api   # listens on RELAY_HTTP_ADDR (defau
 | `GET /ready` | `200 {"status":"ready"}`, or `503` error envelope with `details.failed` when the database ping fails |
 | `GET /api/v1/openapi.yaml` | The OpenAPI 3 contract (`application/yaml`) |
 | `POST /api/v1/jobs` | Submit a job, see below |
+| `GET /api/v1/jobs` | List jobs with filters and cursor pagination, see below |
 | `GET /api/v1/jobs/{id}` | `200` job, `400` invalid UUID, `404` unknown ID |
 
 Errors use `{"error": {"code", "message", "details"}}`. Every response has an `X-Request-ID` header.
@@ -68,6 +69,35 @@ Unknown fields are rejected.
 
 Relay does not check at submit time that a handler exists. Workers may register later, so an unknown
 handler is accepted and fails when a worker picks it up.
+
+## Listing jobs
+
+```sh
+curl 'localhost:8080/api/v1/jobs?status=pending&status=failed&queue=default&limit=20'
+curl 'localhost:8080/api/v1/jobs?cursor=<next_cursor from the previous page>&status=pending&status=failed&queue=default&limit=20'
+```
+
+Response: `{"items": [...], "next_cursor": "..."}`. `next_cursor` is `null` on the last page. Items are job
+summaries: the same fields as `GET /api/v1/jobs/{id}` without `payload`.
+
+| Parameter | Meaning |
+|---|---|
+| `status`, `queue` | Repeatable. Values of one parameter match with OR |
+| `handler` | Exact handler name |
+| `created_after`, `created_before` | RFC 3339. `created_after` is inclusive, `created_before` is exclusive |
+| `worker_id` | UUID of the worker that claimed the job |
+| `id_prefix` | Hex prefix of the job ID, with or without dashes. A full UUID matches exactly |
+| `sort` | `-created_at` (default, newest first) or `created_at` |
+| `limit` | 1 to 200, default 50 |
+| `cursor` | Opaque token from `next_cursor`. Send it with the same filters and `sort` |
+
+Different parameters combine with AND. Ties on `created_at` are ordered by ID, so paging returns every job once.
+
+| Status | When |
+|---|---|
+| `200` | A page, possibly empty |
+| `400 bad_request` | `cursor` was not issued by this API |
+| `422 validation_failed` | A parameter is invalid; `details` maps parameter name to message |
 
 ## OpenAPI contract
 
