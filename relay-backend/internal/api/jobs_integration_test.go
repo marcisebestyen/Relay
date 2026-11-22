@@ -122,3 +122,124 @@ func TestJobs_UnknownIDReturns404(t *testing.T) {
 		t.Errorf("got %d %s", rec.Code, rec.Body)
 	}
 }
+
+type listBody struct {
+	Items []struct {
+		ID      string `json:"id"`
+		Queue   string `json:"queue"`
+		Handler string `json:"handler"`
+		Status  string `json:"status"`
+	} `json:"items"`
+	NextCursor *string `json:"next_cursor"`
+}
+
+func getListBody(t *testing.T, h http.Handler, query string) listBody {
+	t.Helper()
+	rec := getList(h, query)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list %q = %d %s", query, rec.Code, rec.Body)
+	}
+	var b listBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &b); err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+func TestJobs_ListFiltersAndLeavesPayloadOut(t *testing.T) {
+	h := jobsRouterOn(pgtest.NewPool(t))
+	for _, body := range []string{
+		`{"handler":"demo.echo","queue":"a","payload":{"secret":1}}`,
+		`{"handler":"demo.echo","queue":"b"}`,
+		`{"handler":"other","queue":"a"}`,
+	} {
+		if rec := postJob(h, body); rec.Code != http.StatusCreated {
+			t.Fatalf("create = %d %s", rec.Code, rec.Body)
+		}
+	}
+
+	all := getList(h, "")
+	if strings.Contains(all.Body.String(), "payload") || strings.Contains(all.Body.String(), "secret") {
+		t.Errorf("list leaks payload: %s", all.Body)
+	}
+	if got := getListBody(t, h, "queue=a"); len(got.Items) != 2 {
+		t.Errorf("queue=a returned %d items", len(got.Items))
+	}
+	if got := getListBody(t, h, "queue=a&queue=b&handler=demo.echo"); len(got.Items) != 2 {
+		t.Errorf("queue OR + handler returned %d items", len(got.Items))
+	}
+	if got := getListBody(t, h, "queue=b&handler=other"); len(got.Items) != 0 || got.NextCursor != nil {
+		t.Errorf("AND of non matching filters returned %+v", got)
+	}
+	if got := getListBody(t, h, "status=pending&status=failed&sort=created_at"); len(got.Items) != 3 {
+		t.Errorf("status returned %d items", len(got.Items))
+	}
+}
+
+func TestJobs_ListPagesThroughEveryJobOnceInBothOrders(t *testing.T) {
+	h := jobsRouterOn(pgtest.NewPool(t))
+	created := map[string]bool{}
+	for range 7 {
+		rec := postJob(h, `{"handler":"demo.echo"}`)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create = %d %s", rec.Code, rec.Body)
+		}
+		created[strings.TrimPrefix(rec.Header().Get("Location"), "/api/v1/jobs/")] = true
+	}
+	for _, sort := range []string{"created_at", "-created_at"} {
+		t.Run(sort, func(t *testing.T) {
+			seen := map[string]bool{}
+			query := "limit=3&sort=" + sort
+			for pages := 0; ; pages++ {
+				if pages > 3 {
+					t.Fatal("too many pages")
+				}
+				page := getListBody(t, h, query)
+				for _, it := range page.Items {
+					if seen[it.ID] {
+						t.Fatalf("job %s returned twice", it.ID)
+					}
+					seen[it.ID] = true
+				}
+				if page.NextCursor == nil {
+					break
+				}
+				query = "limit=3&sort=" + sort + "&cursor=" + *page.NextCursor
+			}
+			if len(seen) != len(created) {
+				t.Errorf("saw %d jobs, want %d", len(seen), len(created))
+			}
+		})
+	}
+}
+
+func TestJobs_ListRejectsBadParams(t *testing.T) {
+	h := jobsRouterOn(pgtest.NewPool(t))
+	tests := []struct {
+		query  string
+		status int
+		field  string
+	}{
+		{"limit=0", http.StatusUnprocessableEntity, "limit"},
+		{"limit=201", http.StatusUnprocessableEntity, "limit"},
+		{"limit=abc", http.StatusUnprocessableEntity, "limit"},
+		{"status=weird", http.StatusUnprocessableEntity, "status"},
+		{"sort=priority", http.StatusUnprocessableEntity, "sort"},
+		{"id_prefix=zz", http.StatusUnprocessableEntity, "id_prefix"},
+		{"queue=Bad%20Queue", http.StatusUnprocessableEntity, "queue"},
+		{"worker_id=nope", http.StatusUnprocessableEntity, "worker_id"},
+		{"cursor=tampered", http.StatusBadRequest, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			rec := getList(h, tt.query)
+
+			if rec.Code != tt.status {
+				t.Fatalf("status = %d, body %s", rec.Code, rec.Body)
+			}
+			if tt.field != "" && decodeError(t, rec).Error.Details[tt.field] == nil {
+				t.Errorf("details = %v", decodeError(t, rec).Error.Details)
+			}
+		})
+	}
+}

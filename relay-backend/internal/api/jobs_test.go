@@ -26,6 +26,9 @@ type fakeJobs struct {
 	getJob    domain.Job
 	getErr    error
 	getID     uuid.UUID
+	listIn    domain.JobFilter
+	listPage  domain.JobPage
+	listErr   error
 }
 
 func (f *fakeJobs) Create(_ context.Context, in domain.NewJobInput) (domain.Job, error) {
@@ -36,6 +39,11 @@ func (f *fakeJobs) Create(_ context.Context, in domain.NewJobInput) (domain.Job,
 func (f *fakeJobs) Get(_ context.Context, id uuid.UUID) (domain.Job, error) {
 	f.getID = id
 	return f.getJob, f.getErr
+}
+
+func (f *fakeJobs) List(_ context.Context, in domain.JobFilter) (domain.JobPage, error) {
+	f.listIn = in
+	return f.listPage, f.listErr
 }
 
 var sampleJobID = uuid.MustParse("11111111-2222-3333-4444-555555555555")

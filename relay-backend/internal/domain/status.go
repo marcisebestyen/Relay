@@ -56,6 +56,15 @@ func Transition(from, to JobStatus) error {
 	return nil
 }
 
+// IsValid reports whether s is a known job status.
+func (s JobStatus) IsValid() bool {
+	switch s {
+	case JobPending, JobRunning, JobCompleted, JobFailed, JobCancelled:
+		return true
+	}
+	return false
+}
+
 // IsTerminal reports whether no further change is possible. Failed is not
 // terminal because a manual retry can move it back to pending.
 func (s JobStatus) IsTerminal() bool {
