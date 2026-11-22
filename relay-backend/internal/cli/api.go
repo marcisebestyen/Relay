@@ -13,6 +13,8 @@ import (
 
 	"github.com/marcisebestyen/relay/relay-backend/internal/api"
 	"github.com/marcisebestyen/relay/relay-backend/internal/config"
+	"github.com/marcisebestyen/relay/relay-backend/internal/domain"
+	"github.com/marcisebestyen/relay/relay-backend/internal/jobs"
 	"github.com/marcisebestyen/relay/relay-backend/internal/persistence/db"
 )
 
@@ -50,10 +52,27 @@ func runAPI(ctx context.Context, cfg config.Config, logger *slog.Logger) (err er
 		return fmt.Errorf("listen on %s: %w", cfg.HTTP.Addr, err)
 	}
 
+	svc := jobs.NewService(pool, jobDefaults(cfg), nil, nil)
 	handler := api.NewRouter(api.Deps{
 		Logger:       logger,
 		Pinger:       pool,
 		MaxBodyBytes: cfg.Limits.MaxPayloadBytes,
+		Routes:       api.NewJobsHandler(svc, logger).Register,
 	})
 	return api.Serve(ctx, l, handler, cfg.Shutdown.Timeout, logger)
+}
+
+// Queue and priority have no env setting; the rest come from config.
+const (
+	defaultQueue    = "default"
+	defaultPriority = 50
+)
+
+func jobDefaults(cfg config.Config) domain.Defaults {
+	return domain.Defaults{
+		Queue:          defaultQueue,
+		Priority:       defaultPriority,
+		MaxAttempts:    cfg.Retry.DefaultMaxAttempts,
+		TimeoutSeconds: int(cfg.Timeouts.Default.Seconds()),
+	}
 }

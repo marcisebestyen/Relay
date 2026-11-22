@@ -10,6 +10,7 @@ import (
 // Stable error codes returned in the error envelope.
 const (
 	CodeBadRequest       = "bad_request"
+	CodePayloadTooLarge  = "payload_too_large"
 	CodeValidationFailed = "validation_failed"
 	CodeNotFound         = "not_found"
 	CodeMethodNotAllowed = "method_not_allowed"

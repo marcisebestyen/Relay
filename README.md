@@ -39,9 +39,35 @@ cd relay-backend && go run ./cmd/relay api   # listens on RELAY_HTTP_ADDR (defau
 | `GET /health` | `200 {"status":"ok"}` (process only, no DB) |
 | `GET /ready` | `200 {"status":"ready"}`, or `503` error envelope with `details.failed` when the database ping fails |
 | `GET /api/v1/openapi.yaml` | The OpenAPI 3 contract (`application/yaml`) |
+| `POST /api/v1/jobs` | Submit a job, see below |
+| `GET /api/v1/jobs/{id}` | `200` job, `400` invalid UUID, `404` unknown ID |
 
 Errors use `{"error": {"code", "message", "details"}}`. Every response has an `X-Request-ID` header.
 SIGINT/SIGTERM drains in-flight requests for up to `RELAY_SHUTDOWN_TIMEOUT`.
+
+## Submitting a job
+
+```sh
+curl -i -X POST localhost:8080/api/v1/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"handler":"demo.echo","queue":"default","payload":{"hello":"world"},"scheduled_at":"2030-01-02T03:04:05Z"}'
+curl localhost:8080/api/v1/jobs/<id from the Location header>
+```
+
+Only `handler` is required. Optional: `payload` (any JSON, default `{}`), `queue` (default `default`),
+`name`, `priority` (0-100, default 50), `scheduled_at` (RFC 3339; a past time runs right away),
+`max_attempts` (default `RELAY_DEFAULT_MAX_ATTEMPTS`), `timeout_seconds` (default `RELAY_DEFAULT_TIMEOUT`).
+Unknown fields are rejected.
+
+| Status | When |
+|---|---|
+| `201` | Job stored as `pending`; `Location` points at it |
+| `400 bad_request` | Body is not a single valid JSON object, or has an unknown field |
+| `413 payload_too_large` | Body is larger than `RELAY_MAX_PAYLOAD_BYTES` |
+| `422 validation_failed` | A field is invalid; `details` maps field name to message |
+
+Relay does not check at submit time that a handler exists. Workers may register later, so an unknown
+handler is accepted and fails when a worker picks it up.
 
 ## OpenAPI contract
 
