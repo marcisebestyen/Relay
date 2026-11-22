@@ -1,0 +1,445 @@
+openapi: 3.0.3
+info:
+  title: Relay API
+  version: 1.0.0
+  description: >
+    Job queue API. This file is the source contract: the Go server types and
+    the dashboard client are generated from it. Every new endpoint must extend
+    this spec in the same change.
+servers:
+  - url: /
+tags:
+  - name: jobs
+paths:
+  /api/v1/jobs:
+    post:
+      tags: [jobs]
+      operationId: createJob
+      summary: Create a job
+      description: Validates and stores the job. It does not run the handler inline.
+      security:
+        - {}
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobRequest'
+      responses:
+        '201':
+          description: Job created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '500':
+          $ref: '#/components/responses/Internal'
+    get:
+      tags: [jobs]
+      operationId: listJobs
+      summary: List jobs
+      description: Newest first. Uses keyset pagination; pass `next_cursor` back as `cursor`.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - name: queue
+          in: query
+          schema:
+            type: string
+        - name: handler
+          in: query
+          schema:
+            type: string
+        - name: created_from
+          in: query
+          description: Only jobs created at or after this time.
+          schema:
+            type: string
+            format: date-time
+        - name: created_to
+          in: query
+          description: Only jobs created before this time.
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: A page of jobs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /api/v1/jobs/{id}:
+    get:
+      tags: [jobs]
+      operationId: getJob
+      summary: Get a job
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /api/v1/jobs/{id}/attempts:
+    get:
+      tags: [jobs]
+      operationId: listJobAttempts
+      summary: List attempts of a job
+      description: Ordered by attempt number, oldest first.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: A page of attempts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAttemptList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /api/v1/jobs/{id}/events:
+    get:
+      tags: [jobs]
+      operationId: listJobEvents
+      summary: List history events of a job
+      description: Ordered by time, oldest first.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: A page of events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobEventList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /api/v1/openapi.yaml:
+    get:
+      operationId: getOpenAPISpec
+      summary: This OpenAPI document
+      responses:
+        '200':
+          description: The spec as YAML.
+          content:
+            application/yaml:
+              schema:
+                type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Optional. Enforced only when an API token is configured.
+  parameters:
+    JobId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      description: Page size.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque token from a previous `next_cursor`.
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationFailed:
+      description: Request is well formed but a field is invalid. `details` maps field name to message.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or wrong bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Internal:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    JobStatus:
+      type: string
+      enum: [pending, running, completed, failed, cancelled]
+    AttemptStatus:
+      type: string
+      enum: [running, completed, failed, cancelled, timed_out, lost]
+    CreateJobRequest:
+      type: object
+      required: [handler]
+      properties:
+        handler:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9._-]{0,127}$'
+        payload:
+          description: Any JSON value. Defaults to an empty object.
+        name:
+          type: string
+          maxLength: 200
+        queue:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9._-]{0,62}$'
+          description: Defaults to `default`.
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Defaults to 50. Higher runs first.
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 100
+        timeout_seconds:
+          type: integer
+          minimum: 0
+          maximum: 86400
+          description: 0 means no timeout.
+        scheduled_at:
+          type: string
+          format: date-time
+          description: Defaults to now.
+    Job:
+      type: object
+      required:
+        - id
+        - handler
+        - payload
+        - queue
+        - status
+        - priority
+        - scheduled_at
+        - max_attempts
+        - timeout_seconds
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        handler:
+          type: string
+        payload: {}
+        queue:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        priority:
+          type: integer
+        scheduled_at:
+          type: string
+          format: date-time
+        max_attempts:
+          type: integer
+        timeout_seconds:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+    JobList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Null on the last page.
+    JobAttempt:
+      type: object
+      required: [id, job_id, attempt_number, worker_id, status, started_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        attempt_number:
+          type: integer
+          minimum: 1
+        worker_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AttemptStatus'
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        result:
+          nullable: true
+    JobAttemptList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobAttempt'
+        next_cursor:
+          type: string
+          nullable: true
+    JobEvent:
+      type: object
+      required: [id, job_id, type, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        job_id:
+          type: string
+          format: uuid
+        attempt_id:
+          type: string
+          format: uuid
+          nullable: true
+        type:
+          type: string
+          example: job.created
+        data:
+          type: object
+          additionalProperties: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    JobEventList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobEvent'
+        next_cursor:
+          type: string
+          nullable: true
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          properties:
+            code:
+              type: string
+              enum:
+                - bad_request
+                - validation_failed
+                - not_found
+                - method_not_allowed
+                - conflict
+                - unauthorized
+                - unavailable
+                - internal
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true

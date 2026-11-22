@@ -229,3 +229,17 @@ func TestBodyLimitEnforced(t *testing.T) {
 		t.Errorf("read err = %v", readErr)
 	}
 }
+
+func TestOpenAPISpec_IsServed(t *testing.T) {
+	h, _ := newRouter(t, fakePinger{}, nil)
+	rec := do(h, http.MethodGet, "/api/v1/openapi.yaml", nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/yaml" {
+		t.Errorf("Content-Type = %q, want application/yaml", ct)
+	}
+	if !strings.HasPrefix(rec.Body.String(), "openapi: 3.") {
+		t.Errorf("body does not start with an openapi version: %.40q", rec.Body.String())
+	}
+}

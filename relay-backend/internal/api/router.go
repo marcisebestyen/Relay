@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+
+	apispec "github.com/marcisebestyen/relay/relay-backend/api"
 )
 
 const readyTimeout = 2 * time.Second
@@ -43,11 +45,17 @@ func NewRouter(d Deps) http.Handler {
 
 	r.Get("/health", health)
 	r.Get("/ready", ready(d.Logger, d.Pinger))
+	r.Get("/api/v1/openapi.yaml", openAPISpec)
 
 	if d.Routes != nil {
 		d.Routes(r)
 	}
 	return r
+}
+
+func openAPISpec(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/yaml")
+	_, _ = w.Write(apispec.Spec)
 }
 
 func health(w http.ResponseWriter, _ *http.Request) {
