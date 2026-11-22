@@ -9,6 +9,7 @@ import (
 
 	apispec "github.com/marcisebestyen/relay/relay-backend/api"
 	"github.com/marcisebestyen/relay/relay-backend/internal/domain"
+	"github.com/marcisebestyen/relay/relay-backend/internal/persistence/eventsrepo"
 )
 
 func load(t *testing.T) *openapi3.T {
@@ -97,5 +98,32 @@ func TestSpec_AttemptStatusMatchesDomain(t *testing.T) {
 	sort.Strings(want)
 	if got := enumOf(t, "AttemptStatus"); !equal(got, want) {
 		t.Errorf("AttemptStatus enum = %v, want %v", got, want)
+	}
+}
+
+func TestSpec_JobEventTypeMatchesKnownTypes(t *testing.T) {
+	want := append([]string(nil), eventsrepo.KnownTypes...)
+	sort.Strings(want)
+	if got := enumOf(t, "JobEventType"); !equal(got, want) {
+		t.Errorf("JobEventType enum = %v, want %v", got, want)
+	}
+}
+
+func TestSpec_AttemptHasNullableDuration(t *testing.T) {
+	prop := load(t).Components.Schemas["JobAttempt"].Value.Properties["duration_ms"]
+	if prop == nil {
+		t.Fatal("JobAttempt has no duration_ms")
+	}
+	if !prop.Value.Nullable {
+		t.Error("duration_ms must be nullable: it is unset while the attempt runs")
+	}
+}
+
+func TestSpec_ListEndpointsDocumentInvalidLimit(t *testing.T) {
+	doc := load(t)
+	for _, path := range []string{"/api/v1/jobs/{id}/attempts", "/api/v1/jobs/{id}/events"} {
+		if doc.Paths.Find(path).Get.Responses.Status(422) == nil {
+			t.Errorf("%s does not document 422", path)
+		}
 	}
 }

@@ -14,13 +14,17 @@ import (
 
 	"github.com/marcisebestyen/relay/relay-backend/internal/api/gen"
 	"github.com/marcisebestyen/relay/relay-backend/internal/domain"
+	"github.com/marcisebestyen/relay/relay-backend/internal/jobs"
 	"github.com/marcisebestyen/relay/relay-backend/internal/persistence/db"
+	"github.com/marcisebestyen/relay/relay-backend/internal/persistence/eventsrepo"
 )
 
 // JobService is what the job endpoints need from the job use cases.
 type JobService interface {
 	Create(ctx context.Context, in domain.NewJobInput) (domain.Job, error)
 	Get(ctx context.Context, id uuid.UUID) (domain.Job, error)
+	ListAttempts(ctx context.Context, jobID uuid.UUID, afterNumber, limit int) (jobs.Page[domain.JobAttempt], error)
+	ListEvents(ctx context.Context, jobID uuid.UUID, afterID int64, limit int) (jobs.Page[eventsrepo.Event], error)
 }
 
 // JobsHandler serves the job endpoints. The other generated methods stay
@@ -36,12 +40,14 @@ func NewJobsHandler(svc JobService, logger *slog.Logger) *JobsHandler {
 	return &JobsHandler{svc: svc, logger: logger}
 }
 
-// Register adds the create and get routes to r. It wires the generated
+// Register adds the job routes to r. It wires the generated
 // wrapper by hand so routes owned elsewhere (the spec route) stay untouched.
 func (h *JobsHandler) Register(r Router) {
 	w := gen.ServerInterfaceWrapper{Handler: h, ErrorHandlerFunc: paramError}
 	r.Post("/api/v1/jobs", w.CreateJob)
 	r.Get("/api/v1/jobs/{id}", w.GetJob)
+	r.Get("/api/v1/jobs/{id}/attempts", w.ListJobAttempts)
+	r.Get("/api/v1/jobs/{id}/events", w.ListJobEvents)
 }
 
 // paramError turns a generated parameter parsing failure into the envelope.

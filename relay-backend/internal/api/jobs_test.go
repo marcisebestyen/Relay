@@ -26,6 +26,7 @@ type fakeJobs struct {
 	getJob    domain.Job
 	getErr    error
 	getID     uuid.UUID
+	*fakeHistory
 }
 
 func (f *fakeJobs) Create(_ context.Context, in domain.NewJobInput) (domain.Job, error) {
