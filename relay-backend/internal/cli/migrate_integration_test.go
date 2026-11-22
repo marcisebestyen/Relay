@@ -37,7 +37,7 @@ func TestMigrateUpStatusDownAgainstDatabase(t *testing.T) {
 	}
 
 	stdout, _, err = run(t, "migrate", "down")
-	if err != nil || !strings.Contains(stdout, "00001_baseline.sql") {
+	if err != nil || !strings.Contains(stdout, "00002_core_schema.sql") {
 		t.Fatalf("down: out=%q err=%v", stdout, err)
 	}
 }
