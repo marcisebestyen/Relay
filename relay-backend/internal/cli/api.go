@@ -52,11 +52,13 @@ func runAPI(ctx context.Context, cfg config.Config, logger *slog.Logger) (err er
 		return fmt.Errorf("listen on %s: %w", cfg.HTTP.Addr, err)
 	}
 
+	api.LogAuthStatus(logger, cfg.Auth.Token, cfg.HTTP.Addr)
 	svc := jobs.NewService(pool, jobDefaults(cfg), nil, nil)
 	handler := api.NewRouter(api.Deps{
 		Logger:       logger,
 		Pinger:       pool,
 		MaxBodyBytes: cfg.Limits.MaxPayloadBytes,
+		AuthToken:    cfg.Auth.Token,
 		Routes:       api.NewJobsHandler(svc, logger).Register,
 	})
 	return api.Serve(ctx, l, handler, cfg.Shutdown.Timeout, logger)
