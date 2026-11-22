@@ -256,3 +256,33 @@ func TestCreateReturnsErrorWhenDatabaseFails(t *testing.T) {
 		t.Fatal("want error from cancelled context")
 	}
 }
+
+func TestListReturnsCreatedJobsWithoutPayload(t *testing.T) {
+	ctx := context.Background()
+	pool := pgtest.NewPool(t)
+	svc := newService(pool)
+	created, err := svc.Create(ctx, domain.NewJobInput{Handler: "demo.echo", Payload: json.RawMessage(`{"a":1}`)})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	page, err := svc.List(ctx, domain.JobFilter{Sort: domain.SortCreatedAtDesc, Limit: 10})
+
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(page.Items) != 1 || page.Items[0].ID != created.ID || page.Items[0].Payload != nil || page.Next != nil {
+		t.Fatalf("page = %+v", page)
+	}
+}
+
+func TestListRejectsInvalidFilterWithoutQuerying(t *testing.T) {
+	svc := jobs.NewService(nil, defaults, nil, nil)
+
+	_, err := svc.List(context.Background(), domain.JobFilter{Sort: domain.SortCreatedAtDesc, Limit: 0})
+
+	var ve domain.ValidationErrors
+	if !errors.As(err, &ve) || ve["limit"] == "" {
+		t.Fatalf("err = %v, want ValidationErrors for limit", err)
+	}
+}

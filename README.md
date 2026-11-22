@@ -40,12 +40,28 @@ cd relay-backend && go run ./cmd/relay api   # listens on RELAY_HTTP_ADDR (defau
 | `GET /ready` | `200 {"status":"ready"}`, or `503` error envelope with `details.failed` when the database ping fails |
 | `GET /api/v1/openapi.yaml` | The OpenAPI 3 contract (`application/yaml`) |
 | `POST /api/v1/jobs` | Submit a job, see below |
+| `GET /api/v1/jobs` | List jobs with filters and cursor pagination, see below |
 | `GET /api/v1/jobs/{id}` | `200` job, `400` invalid UUID, `404` unknown ID |
 | `GET /api/v1/jobs/{id}/attempts` | Attempt history, see below |
 | `GET /api/v1/jobs/{id}/events` | Job event timeline, see below |
 
 Errors use `{"error": {"code", "message", "details"}}`. Every response has an `X-Request-ID` header.
 SIGINT/SIGTERM drains in-flight requests for up to `RELAY_SHUTDOWN_TIMEOUT`.
+
+## Security
+
+Relay is built for a trusted network. Do not expose it to the internet without the steps below.
+
+- **API token.** Set `RELAY_API_TOKEN` and every `/api/v1/*` request (including `/api/v1/openapi.yaml`) needs
+  `Authorization: Bearer <token>`. A missing or wrong token gets `401 unauthorized` with `WWW-Authenticate: Bearer`.
+  With no token set, the API is open. This is meant for local use only, and the server logs `auth disabled`
+  (a warning when `RELAY_HTTP_ADDR` is not loopback, for example `:8080`).
+- **Exempt routes.** `/health`, `/ready` and `/metrics` never need a token. Protect `/metrics` at the network
+  level (firewall, reverse proxy rule).
+- **SSE.** `GET /api/v1/events` also accepts `?access_token=<token>`, because browsers' `EventSource` cannot set
+  headers. No other route accepts it. The access log records only the request path, never the query.
+- **TLS.** Relay serves plain HTTP. Terminate TLS in a reverse proxy; a bearer token over plain HTTP can be sniffed.
+- **Token rotation.** Change `RELAY_API_TOKEN` and restart the API. There is one token, no users or roles.
 
 ## Submitting a job
 
@@ -70,6 +86,35 @@ Unknown fields are rejected.
 
 Relay does not check at submit time that a handler exists. Workers may register later, so an unknown
 handler is accepted and fails when a worker picks it up.
+
+## Listing jobs
+
+```sh
+curl 'localhost:8080/api/v1/jobs?status=pending&status=failed&queue=default&limit=20'
+curl 'localhost:8080/api/v1/jobs?cursor=<next_cursor from the previous page>&status=pending&status=failed&queue=default&limit=20'
+```
+
+Response: `{"items": [...], "next_cursor": "..."}`. `next_cursor` is `null` on the last page. Items are job
+summaries: the same fields as `GET /api/v1/jobs/{id}` without `payload`.
+
+| Parameter | Meaning |
+|---|---|
+| `status`, `queue` | Repeatable. Values of one parameter match with OR |
+| `handler` | Exact handler name |
+| `created_after`, `created_before` | RFC 3339. `created_after` is inclusive, `created_before` is exclusive |
+| `worker_id` | UUID of the worker that claimed the job |
+| `id_prefix` | Hex prefix of the job ID, with or without dashes. A full UUID matches exactly |
+| `sort` | `-created_at` (default, newest first) or `created_at` |
+| `limit` | 1 to 200, default 50 |
+| `cursor` | Opaque token from `next_cursor`. Send it with the same filters and `sort` |
+
+Different parameters combine with AND. Ties on `created_at` are ordered by ID, so paging returns every job once.
+
+| Status | When |
+|---|---|
+| `200` | A page, possibly empty |
+| `400 bad_request` | `cursor` was not issued by this API |
+| `422 validation_failed` | A parameter is invalid; `details` maps parameter name to message |
 
 ## Attempts and events
 

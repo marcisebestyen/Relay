@@ -59,13 +59,20 @@ func GetByID(ctx context.Context, q db.Querier, id uuid.UUID) (domain.Job, error
 	if err != nil {
 		return domain.Job{}, fmt.Errorf("select job %s: %w", id, err)
 	}
+	fill(&job, name, status, timeout)
+	job.Payload = json.RawMessage(payload)
+	return job, nil
+}
+
+// fill sets the fields that need conversion from their column form: NULL name
+// and timeout become zero values, and times are made UTC.
+func fill(job *domain.Job, name *string, status string, timeout *int) {
 	if name != nil {
 		job.Name = *name
 	}
 	if timeout != nil {
 		job.TimeoutSeconds = *timeout
 	}
-	job.Payload = json.RawMessage(payload)
 	job.Status = domain.JobStatus(status)
 	job.ScheduledAt = job.ScheduledAt.UTC()
 	job.CreatedAt = job.CreatedAt.UTC()
@@ -74,5 +81,4 @@ func GetByID(ctx context.Context, q db.Querier, id uuid.UUID) (domain.Job, error
 		t := job.CompletedAt.UTC()
 		job.CompletedAt = &t
 	}
-	return job, nil
 }

@@ -52,35 +52,69 @@ paths:
       tags: [jobs]
       operationId: listJobs
       summary: List jobs
-      description: Newest first. Uses keyset pagination; pass `next_cursor` back as `cursor`.
+      description: >
+        Filters combine with AND; repeated values of one filter combine with OR.
+        Uses keyset pagination: pass `next_cursor` back as `cursor` with the same
+        filters and sort. The payload is left out; use `GET /api/v1/jobs/{id}` for it.
       security:
         - {}
         - bearerAuth: []
       parameters:
         - name: status
           in: query
+          description: Repeatable. A job matches if its status equals any given value.
           schema:
-            $ref: '#/components/schemas/JobStatus'
+            type: array
+            items:
+              $ref: '#/components/schemas/JobStatus'
+          style: form
+          explode: true
         - name: queue
           in: query
+          description: Repeatable. A job matches if its queue equals any given value.
           schema:
-            type: string
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
         - name: handler
           in: query
+          description: Exact handler name.
           schema:
             type: string
-        - name: created_from
+        - name: created_after
           in: query
           description: Only jobs created at or after this time.
           schema:
             type: string
             format: date-time
-        - name: created_to
+        - name: created_before
           in: query
           description: Only jobs created before this time.
           schema:
             type: string
             format: date-time
+        - name: worker_id
+          in: query
+          description: Only jobs claimed by this worker.
+          schema:
+            type: string
+            format: uuid
+        - name: id_prefix
+          in: query
+          description: >
+            Hex prefix of the job ID, with or without dashes. A full UUID
+            matches exactly that job.
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort by creation time; a leading `-` means newest first.
+          schema:
+            type: string
+            enum: [created_at, -created_at]
+            default: -created_at
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
       responses:
@@ -94,6 +128,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
         '500':
           $ref: '#/components/responses/Internal'
   /api/v1/jobs/{id}:
@@ -190,6 +226,10 @@ paths:
     get:
       operationId: getOpenAPISpec
       summary: This OpenAPI document
+      description: Requires the API token when one is configured.
+      security:
+        - {}
+        - bearerAuth: []
       responses:
         '200':
           description: The spec as YAML.
@@ -197,6 +237,8 @@ paths:
             application/yaml:
               schema:
                 type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 components:
   securitySchemes:
     bearerAuth:
@@ -228,7 +270,7 @@ components:
         type: string
   responses:
     BadRequest:
-      description: Malformed request.
+      description: Malformed request, or a `cursor` this API did not issue.
       content:
         application/json:
           schema:
@@ -304,12 +346,11 @@ components:
           type: string
           format: date-time
           description: Defaults to now.
-    Job:
+    JobSummary:
       type: object
       required:
         - id
         - handler
-        - payload
         - queue
         - status
         - priority
@@ -326,7 +367,6 @@ components:
           type: string
         handler:
           type: string
-        payload: {}
         queue:
           type: string
         status:
@@ -353,6 +393,13 @@ components:
         last_error:
           type: string
           nullable: true
+    Job:
+      allOf:
+        - $ref: '#/components/schemas/JobSummary'
+        - type: object
+          required: [payload]
+          properties:
+            payload: {}
     JobList:
       type: object
       required: [items]
@@ -360,7 +407,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/Job'
+            $ref: '#/components/schemas/JobSummary'
         next_cursor:
           type: string
           nullable: true

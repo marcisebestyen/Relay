@@ -23,6 +23,7 @@ import (
 type JobService interface {
 	Create(ctx context.Context, in domain.NewJobInput) (domain.Job, error)
 	Get(ctx context.Context, id uuid.UUID) (domain.Job, error)
+	List(ctx context.Context, f domain.JobFilter) (domain.JobPage, error)
 	ListAttempts(ctx context.Context, jobID uuid.UUID, afterNumber, limit int) (jobs.Page[domain.JobAttempt], error)
 	ListEvents(ctx context.Context, jobID uuid.UUID, afterID int64, limit int) (jobs.Page[eventsrepo.Event], error)
 }
@@ -40,11 +41,13 @@ func NewJobsHandler(svc JobService, logger *slog.Logger) *JobsHandler {
 	return &JobsHandler{svc: svc, logger: logger}
 }
 
-// Register adds the job routes to r. It wires the generated
+// Register adds the create, get, list and history routes to r. It wires the generated
 // wrapper by hand so routes owned elsewhere (the spec route) stay untouched.
 func (h *JobsHandler) Register(r Router) {
 	w := gen.ServerInterfaceWrapper{Handler: h, ErrorHandlerFunc: paramError}
 	r.Post("/api/v1/jobs", w.CreateJob)
+	lw := gen.ServerInterfaceWrapper{Handler: h, ErrorHandlerFunc: listParamError}
+	r.Get("/api/v1/jobs", lw.ListJobs)
 	r.Get("/api/v1/jobs/{id}", w.GetJob)
 	r.Get("/api/v1/jobs/{id}/attempts", w.ListJobAttempts)
 	r.Get("/api/v1/jobs/{id}/events", w.ListJobEvents)

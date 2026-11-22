@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -20,8 +19,6 @@ const (
 	defaultPageLimit = 50
 	maxPageLimit     = 200
 )
-
-var errInvalidCursor = errors.New("cursor is not valid")
 
 // ListJobAttempts handles GET /api/v1/jobs/{id}/attempts.
 func (h *JobsHandler) ListJobAttempts(w http.ResponseWriter, r *http.Request, id gen.JobId, params gen.ListJobAttemptsParams) {
@@ -98,7 +95,7 @@ func pageCursor(w http.ResponseWriter, cursor *string, upper int64) (int64, bool
 	if cursor == nil {
 		return 0, true
 	}
-	n, err := decodeCursor(*cursor)
+	n, err := decodeNumberCursor(*cursor)
 	if err != nil || n > upper {
 		WriteError(w, http.StatusBadRequest, CodeBadRequest, errInvalidCursor.Error(), nil)
 		return 0, false
@@ -106,12 +103,12 @@ func pageCursor(w http.ResponseWriter, cursor *string, upper int64) (int64, bool
 	return n, true
 }
 
-// Cursors are opaque to clients. Both lists page on one positive number.
-func encodeCursor(n int64) string {
+// Cursors are opaque to clients. Attempts and events page on one positive number.
+func encodeNumberCursor(n int64) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(strconv.FormatInt(n, 10)))
 }
 
-func decodeCursor(s string) (int64, error) {
+func decodeNumberCursor(s string) (int64, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
 		return 0, errInvalidCursor
@@ -124,7 +121,7 @@ func decodeCursor(s string) (int64, error) {
 }
 
 func nextCursor(n int64) *string {
-	c := encodeCursor(n)
+	c := encodeNumberCursor(n)
 	return &c
 }
 

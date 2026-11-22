@@ -155,6 +155,24 @@ func (e JobStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListJobsParamsSort.
+const (
+	CreatedAt      ListJobsParamsSort = "created_at"
+	MinusCreatedAt ListJobsParamsSort = "-created_at"
+)
+
+// Valid indicates whether the value is a known member of the ListJobsParamsSort enum.
+func (e ListJobsParamsSort) Valid() bool {
+	switch e {
+	case CreatedAt:
+		return true
+	case MinusCreatedAt:
+		return true
+	default:
+		return false
+	}
+}
+
 // AttemptStatus defines model for AttemptStatus.
 type AttemptStatus string
 
@@ -255,7 +273,7 @@ type JobEventType string
 
 // JobList defines model for JobList.
 type JobList struct {
-	Items []Job `json:"items"`
+	Items []JobSummary `json:"items"`
 
 	// NextCursor Null on the last page.
 	NextCursor *string `json:"next_cursor"`
@@ -263,6 +281,23 @@ type JobList struct {
 
 // JobStatus defines model for JobStatus.
 type JobStatus string
+
+// JobSummary defines model for JobSummary.
+type JobSummary struct {
+	CompletedAt    *time.Time         `json:"completed_at"`
+	CreatedAt      time.Time          `json:"created_at"`
+	Handler        string             `json:"handler"`
+	Id             openapi_types.UUID `json:"id"`
+	LastError      *string            `json:"last_error"`
+	MaxAttempts    int                `json:"max_attempts"`
+	Name           *string            `json:"name,omitempty"`
+	Priority       int                `json:"priority"`
+	Queue          string             `json:"queue"`
+	ScheduledAt    time.Time          `json:"scheduled_at"`
+	Status         JobStatus          `json:"status"`
+	TimeoutSeconds int                `json:"timeout_seconds"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+}
 
 // Cursor defines model for Cursor.
 type Cursor = string
@@ -293,15 +328,29 @@ type ValidationFailed = Error
 
 // ListJobsParams defines parameters for ListJobs.
 type ListJobsParams struct {
-	Status  *JobStatus `form:"status,omitempty" json:"status,omitempty"`
-	Queue   *string    `form:"queue,omitempty" json:"queue,omitempty"`
-	Handler *string    `form:"handler,omitempty" json:"handler,omitempty"`
+	// Status Repeatable. A job matches if its status equals any given value.
+	Status *[]JobStatus `form:"status,omitempty" json:"status,omitempty"`
 
-	// CreatedFrom Only jobs created at or after this time.
-	CreatedFrom *time.Time `form:"created_from,omitempty" json:"created_from,omitempty"`
+	// Queue Repeatable. A job matches if its queue equals any given value.
+	Queue *[]string `form:"queue,omitempty" json:"queue,omitempty"`
 
-	// CreatedTo Only jobs created before this time.
-	CreatedTo *time.Time `form:"created_to,omitempty" json:"created_to,omitempty"`
+	// Handler Exact handler name.
+	Handler *string `form:"handler,omitempty" json:"handler,omitempty"`
+
+	// CreatedAfter Only jobs created at or after this time.
+	CreatedAfter *time.Time `form:"created_after,omitempty" json:"created_after,omitempty"`
+
+	// CreatedBefore Only jobs created before this time.
+	CreatedBefore *time.Time `form:"created_before,omitempty" json:"created_before,omitempty"`
+
+	// WorkerId Only jobs claimed by this worker.
+	WorkerId *openapi_types.UUID `form:"worker_id,omitempty" json:"worker_id,omitempty"`
+
+	// IdPrefix Hex prefix of the job ID, with or without dashes. A full UUID matches exactly that job.
+	IdPrefix *string `form:"id_prefix,omitempty" json:"id_prefix,omitempty"`
+
+	// Sort Sort by creation time; a leading `-` means newest first.
+	Sort *ListJobsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Limit Page size.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
@@ -309,6 +358,9 @@ type ListJobsParams struct {
 	// Cursor Opaque token from a previous `next_cursor`.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
+
+// ListJobsParamsSort defines parameters for ListJobs.
+type ListJobsParamsSort string
 
 // ListJobAttemptsParams defines parameters for ListJobAttempts.
 type ListJobAttemptsParams struct {
@@ -412,7 +464,7 @@ func (siw *ServerInterfaceWrapper) ListJobs(w http.ResponseWriter, r *http.Reque
 
 	// ------------- Optional query parameter "status" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -425,7 +477,7 @@ func (siw *ServerInterfaceWrapper) ListJobs(w http.ResponseWriter, r *http.Reque
 
 	// ------------- Optional query parameter "queue" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "queue", r.URL.Query(), &params.Queue, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "queue", r.URL.Query(), &params.Queue, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -449,28 +501,67 @@ func (siw *ServerInterfaceWrapper) ListJobs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// ------------- Optional query parameter "created_from" -------------
+	// ------------- Optional query parameter "created_after" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "created_from", r.URL.Query(), &params.CreatedFrom, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "created_after", r.URL.Query(), &params.CreatedAfter, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "created_from"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "created_after"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "created_from", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "created_after", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "created_to" -------------
+	// ------------- Optional query parameter "created_before" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "created_to", r.URL.Query(), &params.CreatedTo, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "created_before", r.URL.Query(), &params.CreatedBefore, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "created_to"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "created_before"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "created_to", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "created_before", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "worker_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "worker_id", r.URL.Query(), &params.WorkerId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "worker_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "worker_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "id_prefix" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "id_prefix", r.URL.Query(), &params.IdPrefix, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "id_prefix"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id_prefix", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
 		}
 		return
 	}

@@ -26,6 +26,8 @@ type Deps struct {
 	Logger       *slog.Logger
 	Pinger       Pinger
 	MaxBodyBytes int64
+	// AuthToken turns on bearer auth for /api/v1 when not empty.
+	AuthToken string
 	// Routes registers extra routes (used by later tickets). May be nil.
 	Routes func(r Router)
 }
@@ -35,6 +37,9 @@ type Deps struct {
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
 	r.Use(requestID, accessLog(d.Logger), recoverer(d.Logger), bodyLimit(d.MaxBodyBytes))
+	if d.AuthToken != "" {
+		r.Use(bearerAuth(d.AuthToken))
+	}
 
 	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
 		WriteError(w, http.StatusNotFound, CodeNotFound, "route not found", nil)
