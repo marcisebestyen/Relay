@@ -7,7 +7,19 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build test test-integration lint migrate-up migrate-down migrate-status infra-up infra-down infra-reset
+.PHONY: generate generate-check build test test-integration lint migrate-up migrate-down migrate-status infra-up infra-down infra-reset
+
+generate:
+	cd $(BACKEND) && go tool oapi-codegen -config api/oapi-codegen.yaml api/openapi.yaml
+
+# Fails if running generate changes the generated files.
+generate-check:
+	@before=$$(cat $(BACKEND)/internal/api/gen/*.go | shasum); \
+	$(MAKE) --no-print-directory generate; \
+	after=$$(cat $(BACKEND)/internal/api/gen/*.go | shasum); \
+	if [ "$$before" != "$$after" ]; then \
+		echo "generated code was out of date; it is regenerated now, review and commit"; exit 1; \
+	fi
 
 build:
 	cd $(BACKEND) && go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/relay
