@@ -45,6 +45,21 @@ cd relay-backend && go run ./cmd/relay api   # listens on RELAY_HTTP_ADDR (defau
 Errors use `{"error": {"code", "message", "details"}}`. Every response has an `X-Request-ID` header.
 SIGINT/SIGTERM drains in-flight requests for up to `RELAY_SHUTDOWN_TIMEOUT`.
 
+## Security
+
+Relay is built for a trusted network. Do not expose it to the internet without the steps below.
+
+- **API token.** Set `RELAY_API_TOKEN` and every `/api/v1/*` request (including `/api/v1/openapi.yaml`) needs
+  `Authorization: Bearer <token>`. A missing or wrong token gets `401 unauthorized` with `WWW-Authenticate: Bearer`.
+  With no token set, the API is open. This is meant for local use only, and the server logs `auth disabled`
+  (a warning when `RELAY_HTTP_ADDR` is not loopback, for example `:8080`).
+- **Exempt routes.** `/health`, `/ready` and `/metrics` never need a token. Protect `/metrics` at the network
+  level (firewall, reverse proxy rule).
+- **SSE.** `GET /api/v1/events` also accepts `?access_token=<token>`, because browsers' `EventSource` cannot set
+  headers. No other route accepts it. The access log records only the request path, never the query.
+- **TLS.** Relay serves plain HTTP. Terminate TLS in a reverse proxy; a bearer token over plain HTTP can be sniffed.
+- **Token rotation.** Change `RELAY_API_TOKEN` and restart the API. There is one token, no users or roles.
+
 ## Submitting a job
 
 ```sh

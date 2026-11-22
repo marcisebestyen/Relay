@@ -181,6 +181,10 @@ paths:
     get:
       operationId: getOpenAPISpec
       summary: This OpenAPI document
+      description: Requires the API token when one is configured.
+      security:
+        - {}
+        - bearerAuth: []
       responses:
         '200':
           description: The spec as YAML.
@@ -188,6 +192,8 @@ paths:
             application/yaml:
               schema:
                 type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 components:
   securitySchemes:
     bearerAuth:
