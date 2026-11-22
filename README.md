@@ -42,6 +42,8 @@ cd relay-backend && go run ./cmd/relay api   # listens on RELAY_HTTP_ADDR (defau
 | `POST /api/v1/jobs` | Submit a job, see below |
 | `GET /api/v1/jobs` | List jobs with filters and cursor pagination, see below |
 | `GET /api/v1/jobs/{id}` | `200` job, `400` invalid UUID, `404` unknown ID |
+| `GET /api/v1/jobs/{id}/attempts` | Attempt history, see below |
+| `GET /api/v1/jobs/{id}/events` | Job event timeline, see below |
 
 Errors use `{"error": {"code", "message", "details"}}`. Every response has an `X-Request-ID` header.
 SIGINT/SIGTERM drains in-flight requests for up to `RELAY_SHUTDOWN_TIMEOUT`.
@@ -113,6 +115,29 @@ Different parameters combine with AND. Ties on `created_at` are ordered by ID, s
 | `200` | A page, possibly empty |
 | `400 bad_request` | `cursor` was not issued by this API |
 | `422 validation_failed` | A parameter is invalid; `details` maps parameter name to message |
+
+## Attempts and events
+
+```sh
+curl 'localhost:8080/api/v1/jobs/<id>/attempts?limit=20'
+curl 'localhost:8080/api/v1/jobs/<id>/events?cursor=<next_cursor from the previous page>'
+```
+
+Both return `{"items": [...], "next_cursor": ...}`. `next_cursor` is `null` on the last page; pass it back as
+`cursor` for the next one. Cursors are opaque. `limit` is 1-200 (default 50).
+
+- Attempts are ordered by `attempt_number`. `duration_ms` is derived from `started_at` and `finished_at`
+  and is `null` while the attempt is `running`.
+- Events are ordered by `created_at`, then `id`. `type` is one of the known values in the spec
+  (`job.created`, `attempt.started`, `retry.scheduled`, ...); clients must tolerate new ones.
+  `data` is small and never contains the job payload.
+
+| Status | When |
+|---|---|
+| `200` | A page; an existing job with no attempts or events yet returns `"items": []` |
+| `400 bad_request` | Invalid job UUID, non-numeric `limit`, or an invalid `cursor` |
+| `404 not_found` | The job does not exist |
+| `422 validation_failed` | `limit` is below 1 or above 200; `details.limit` has the message |
 
 ## OpenAPI contract
 

@@ -83,6 +83,51 @@ func (e ErrorErrorCode) Valid() bool {
 	}
 }
 
+// Defines values for JobEventType.
+const (
+	AttemptCancelled     JobEventType = "attempt.cancelled"
+	AttemptCompleted     JobEventType = "attempt.completed"
+	AttemptFailed        JobEventType = "attempt.failed"
+	AttemptLost          JobEventType = "attempt.lost"
+	AttemptStarted       JobEventType = "attempt.started"
+	AttemptTimedOut      JobEventType = "attempt.timed_out"
+	CancelRequested      JobEventType = "cancel.requested"
+	JobCreated           JobEventType = "job.created"
+	JobStatusChanged     JobEventType = "job.status_changed"
+	ManualRetryRequested JobEventType = "manual_retry.requested"
+	RetryScheduled       JobEventType = "retry.scheduled"
+)
+
+// Valid indicates whether the value is a known member of the JobEventType enum.
+func (e JobEventType) Valid() bool {
+	switch e {
+	case AttemptCancelled:
+		return true
+	case AttemptCompleted:
+		return true
+	case AttemptFailed:
+		return true
+	case AttemptLost:
+		return true
+	case AttemptStarted:
+		return true
+	case AttemptTimedOut:
+		return true
+	case CancelRequested:
+		return true
+	case JobCreated:
+		return true
+	case JobStatusChanged:
+		return true
+	case ManualRetryRequested:
+		return true
+	case RetryScheduled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for JobStatus.
 const (
 	JobStatusCancelled JobStatus = "cancelled"
@@ -185,15 +230,18 @@ type Job struct {
 
 // JobAttempt defines model for JobAttempt.
 type JobAttempt struct {
-	AttemptNumber int                `json:"attempt_number"`
-	Error         *string            `json:"error"`
-	FinishedAt    *time.Time         `json:"finished_at"`
-	Id            openapi_types.UUID `json:"id"`
-	JobId         openapi_types.UUID `json:"job_id"`
-	Result        any                `json:"result"`
-	StartedAt     time.Time          `json:"started_at"`
-	Status        AttemptStatus      `json:"status"`
-	WorkerId      openapi_types.UUID `json:"worker_id"`
+	AttemptNumber int `json:"attempt_number"`
+
+	// DurationMs Milliseconds between `started_at` and `finished_at`. Null while the attempt runs.
+	DurationMs *int64             `json:"duration_ms"`
+	Error      *string            `json:"error"`
+	FinishedAt *time.Time         `json:"finished_at"`
+	Id         openapi_types.UUID `json:"id"`
+	JobId      openapi_types.UUID `json:"job_id"`
+	Result     any                `json:"result"`
+	StartedAt  time.Time          `json:"started_at"`
+	Status     AttemptStatus      `json:"status"`
+	WorkerId   openapi_types.UUID `json:"worker_id"`
 }
 
 // JobAttemptList defines model for JobAttemptList.
@@ -210,8 +258,8 @@ type JobEvent struct {
 	Id        int64               `json:"id"`
 	JobId     openapi_types.UUID  `json:"job_id"`
 
-	// Type Example: job.created
-	Type string `json:"type"`
+	// Type Known event types. New types may be added later, so clients must tolerate values not listed here.
+	Type JobEventType `json:"type"`
 }
 
 // JobEventList defines model for JobEventList.
@@ -219,6 +267,9 @@ type JobEventList struct {
 	Items      []JobEvent `json:"items"`
 	NextCursor *string    `json:"next_cursor"`
 }
+
+// JobEventType Known event types. New types may be added later, so clients must tolerate values not listed here.
+type JobEventType string
 
 // JobList defines model for JobList.
 type JobList struct {

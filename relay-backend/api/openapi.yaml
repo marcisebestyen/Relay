@@ -162,7 +162,9 @@ paths:
       tags: [jobs]
       operationId: listJobAttempts
       summary: List attempts of a job
-      description: Ordered by attempt number, oldest first.
+      description: >
+        Ordered by attempt number, oldest first. `404` when the job does not exist.
+        An invalid `cursor` is a `400`; a `limit` outside 1..200 is a `422`.
       security:
         - {}
         - bearerAuth: []
@@ -183,6 +185,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
         '500':
           $ref: '#/components/responses/Internal'
   /api/v1/jobs/{id}/events:
@@ -190,7 +194,10 @@ paths:
       tags: [jobs]
       operationId: listJobEvents
       summary: List history events of a job
-      description: Ordered by time, oldest first.
+      description: >
+        Ordered by creation time, then id, oldest first. `404` when the job does not exist.
+        An invalid `cursor` is a `400`; a `limit` outside 1..200 is a `422`.
+        `data` is small and never holds the job payload.
       security:
         - {}
         - bearerAuth: []
@@ -211,6 +218,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
         '500':
           $ref: '#/components/responses/Internal'
   /api/v1/openapi.yaml:
@@ -428,6 +437,11 @@ components:
           type: string
           format: date-time
           nullable: true
+        duration_ms:
+          type: integer
+          format: int64
+          nullable: true
+          description: Milliseconds between `started_at` and `finished_at`. Null while the attempt runs.
         error:
           type: string
           nullable: true
@@ -459,8 +473,7 @@ components:
           format: uuid
           nullable: true
         type:
-          type: string
-          example: job.created
+          $ref: '#/components/schemas/JobEventType'
         data:
           type: object
           additionalProperties: true
@@ -468,6 +481,23 @@ components:
         created_at:
           type: string
           format: date-time
+    JobEventType:
+      type: string
+      description: >
+        Known event types. New types may be added later, so clients must tolerate
+        values not listed here.
+      enum:
+        - job.created
+        - attempt.started
+        - attempt.completed
+        - attempt.failed
+        - attempt.cancelled
+        - attempt.timed_out
+        - attempt.lost
+        - retry.scheduled
+        - manual_retry.requested
+        - cancel.requested
+        - job.status_changed
     JobEventList:
       type: object
       required: [items]

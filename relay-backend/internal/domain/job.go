@@ -31,7 +31,7 @@ type JobAttempt struct {
 	ID            uuid.UUID
 	JobID         uuid.UUID
 	AttemptNumber int
-	WorkerID      string
+	WorkerID      uuid.UUID
 	Status        AttemptStatus
 	StartedAt     time.Time
 	FinishedAt    *time.Time
