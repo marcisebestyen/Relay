@@ -43,6 +43,8 @@ type Auth struct {
 type Worker struct {
 	Queues      []string
 	Concurrency int
+	// StaleAfter is how old a heartbeat can be before the worker shows as stale.
+	StaleAfter time.Duration
 }
 
 // Lease holds job lease and heartbeat durations.
@@ -99,6 +101,7 @@ var specs = []spec{
 	text("RELAY_API_TOKEN", "", func(c *Config) *string { return &c.Auth.Token }),
 	list("RELAY_WORKER_QUEUES", "default", func(c *Config) *[]string { return &c.Worker.Queues }),
 	number("RELAY_WORKER_CONCURRENCY", "4", func(c *Config) *int { return &c.Worker.Concurrency }),
+	duration("RELAY_WORKER_STALE_AFTER", "30s", func(c *Config) *time.Duration { return &c.Worker.StaleAfter }),
 	duration("RELAY_HEARTBEAT_INTERVAL", "10s", func(c *Config) *time.Duration { return &c.Lease.HeartbeatInterval }),
 	duration("RELAY_LEASE_DURATION", "30s", func(c *Config) *time.Duration { return &c.Lease.Duration }),
 	number("RELAY_DEFAULT_MAX_ATTEMPTS", "3", func(c *Config) *int { return &c.Retry.DefaultMaxAttempts }),
