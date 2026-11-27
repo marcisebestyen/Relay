@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/marcisebestyen/relay/relay-backend/internal/cli"
+	"github.com/marcisebestyen/relay/relay-backend/pkg/relay"
+	relaycli "github.com/marcisebestyen/relay/relay-backend/pkg/relay/cli"
 )
 
 // Set via -ldflags at build time.
@@ -16,7 +17,8 @@ var (
 )
 
 func main() {
-	root := cli.NewRootCmd(cli.BuildInfo{Version: version, Commit: commit, Date: date})
+	// No handlers are built into this binary yet, so worker and start refuse to run.
+	root := relaycli.NewRootCommand(relay.NewRegistry(), relaycli.BuildInfo{Version: version, Commit: commit, Date: date})
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)

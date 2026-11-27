@@ -67,6 +67,7 @@ func (c Config) validateWorker() []error {
 	add(len(c.Worker.Queues) > 0, "RELAY_WORKER_QUEUES needs at least one queue")
 	add(c.Worker.Concurrency >= 1, "RELAY_WORKER_CONCURRENCY must be >= 1")
 	add(c.Worker.StaleAfter > 0, "RELAY_WORKER_STALE_AFTER must be > 0")
+	add(c.Worker.PollInterval > 0, "RELAY_WORKER_POLL_INTERVAL must be > 0")
 	add(c.Lease.Duration > 0, "RELAY_LEASE_DURATION must be > 0")
 	add(c.Limits.MaxResultBytes > 0, "RELAY_MAX_RESULT_BYTES must be > 0")
 	add(c.Lease.HeartbeatInterval > 0, "RELAY_HEARTBEAT_INTERVAL must be > 0")

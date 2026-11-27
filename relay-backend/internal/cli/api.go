@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 
 	"github.com/marcisebestyen/relay/relay-backend/internal/api"
@@ -39,13 +41,7 @@ func runAPI(ctx context.Context, cfg config.Config, logger *slog.Logger) (err er
 	if err != nil {
 		return err
 	}
-	defer func() {
-		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), poolCloseTimeout)
-		defer cancel()
-		if closeErr := db.Close(closeCtx, pool); err == nil {
-			err = closeErr
-		}
-	}()
+	defer closePool(ctx, pool, &err)
 
 	l, err := net.Listen("tcp", cfg.HTTP.Addr)
 	if err != nil {
@@ -53,15 +49,28 @@ func runAPI(ctx context.Context, cfg config.Config, logger *slog.Logger) (err er
 	}
 
 	api.LogAuthStatus(logger, cfg.Auth.Token, cfg.HTTP.Addr)
+	return api.Serve(ctx, l, apiHandler(pool, cfg, logger), cfg.Shutdown.Timeout, logger)
+}
+
+// apiHandler builds the HTTP handler for the job API on pool.
+func apiHandler(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) http.Handler {
 	svc := jobs.NewService(pool, jobDefaults(cfg), nil, nil)
-	handler := api.NewRouter(api.Deps{
+	return api.NewRouter(api.Deps{
 		Logger:       logger,
 		Pinger:       pool,
 		MaxBodyBytes: cfg.Limits.MaxPayloadBytes,
 		AuthToken:    cfg.Auth.Token,
 		Routes:       api.NewJobsHandler(svc, logger).Register,
 	})
-	return api.Serve(ctx, l, handler, cfg.Shutdown.Timeout, logger)
+}
+
+// closePool closes pool and reports a close error only when err is nil.
+func closePool(ctx context.Context, pool *pgxpool.Pool, err *error) {
+	closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), poolCloseTimeout)
+	defer cancel()
+	if closeErr := db.Close(closeCtx, pool); *err == nil {
+		*err = closeErr
+	}
 }
 
 // Queue and priority have no env setting; the rest come from config.

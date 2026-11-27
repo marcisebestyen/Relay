@@ -9,6 +9,7 @@ import (
 
 	"github.com/marcisebestyen/relay/relay-backend/internal/config"
 	"github.com/marcisebestyen/relay/relay-backend/internal/observability/logging"
+	"github.com/marcisebestyen/relay/relay-backend/pkg/relay"
 )
 
 const (
@@ -51,8 +52,9 @@ type BuildInfo struct {
 	Date    string
 }
 
-// NewRootCmd builds the `relay` root command.
-func NewRootCmd(info BuildInfo) *cobra.Command {
+// NewRootCmd builds the `relay` root command. registry holds the handlers this
+// binary can run; worker and start refuse to run when it is empty.
+func NewRootCmd(info BuildInfo, registry *relay.Registry) *cobra.Command {
 	var logLevel string
 	var logger *slog.Logger
 	var cfg config.Config
@@ -91,7 +93,12 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		},
 	})
 
-	root.AddCommand(newMigrateCmd(&cfg), newAPICmd(&cfg, &logger))
+	root.AddCommand(
+		newMigrateCmd(&cfg),
+		newAPICmd(&cfg, &logger),
+		newWorkerCmd(&cfg, &logger, registry, info.Version),
+		newStartCmd(&cfg, &logger, registry, info.Version),
+	)
 
 	return root
 }

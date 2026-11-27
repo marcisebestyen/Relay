@@ -48,6 +48,24 @@ cd relay-backend && go run ./cmd/relay api   # listens on RELAY_HTTP_ADDR (defau
 Errors use `{"error": {"code", "message", "details"}}`. Every response has an `X-Request-ID` header.
 SIGINT/SIGTERM drains in-flight requests for up to `RELAY_SHUTDOWN_TIMEOUT`.
 
+## Workers
+
+Workers run the handlers registered in the binary. A binary with no handlers
+refuses to start `worker` and `start`. `cmd/relay` has no handlers yet, so it
+can only run `api` and `migrate`. Applications build their own binary with
+`pkg/relay/cli.NewRootCommand(registry, info)`.
+
+```sh
+relay worker --queues=default,emails --concurrency=4   # flags override RELAY_WORKER_* env
+relay start                                            # API and worker in one process, shared pool
+```
+
+- Each worker claims one job per free slot, so it never runs more than `--concurrency` handlers at once.
+- When no job is eligible, the worker waits `RELAY_WORKER_POLL_INTERVAL` (default `1s`) before it claims again.
+- Handlers read their job with `relay.JobInfoFromContext(ctx)` (job ID, attempt number, queue, worker ID).
+- A handler panic is recorded as a `panic` failure. The worker keeps running.
+- SIGINT/SIGTERM stops claiming. Running jobs get `RELAY_SHUTDOWN_TIMEOUT` to finish. Then their contexts are cancelled, and any that still run are left to lease expiry.
+
 ## Security
 
 Relay is built for a trusted network. Do not expose it to the internet without the steps below.
