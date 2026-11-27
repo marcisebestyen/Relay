@@ -12,12 +12,18 @@ import (
 
 	"github.com/marcisebestyen/relay/relay-backend/internal/cli"
 	"github.com/marcisebestyen/relay/relay-backend/internal/config"
+	"github.com/marcisebestyen/relay/relay-backend/pkg/relay"
 )
 
 func run(t *testing.T, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
+	return runWith(t, relay.NewRegistry(), args...)
+}
+
+func runWith(t *testing.T, reg *relay.Registry, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
 	var out, errOut bytes.Buffer
-	cmd := cli.NewRootCmd(cli.BuildInfo{Version: "1.2.3", Commit: "abc123", Date: "2026-01-02"})
+	cmd := cli.NewRootCmd(cli.BuildInfo{Version: "1.2.3", Commit: "abc123", Date: "2026-01-02"}, reg)
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
 	cmd.SetArgs(args)
@@ -68,7 +74,7 @@ func TestInvalidLogLevelFails(t *testing.T) {
 func runWithRole(t *testing.T, role config.Role, args ...string) (stderr string, err error) {
 	t.Helper()
 	var errOut bytes.Buffer
-	cmd := cli.NewRootCmd(cli.BuildInfo{})
+	cmd := cli.NewRootCmd(cli.BuildInfo{}, relay.NewRegistry())
 	probe := &cobra.Command{Use: "probe", RunE: func(*cobra.Command, []string) error { return nil }}
 	cli.SetRole(probe, role)
 	cmd.AddCommand(probe)
