@@ -12,6 +12,18 @@ import (
 	"github.com/marcisebestyen/relay/relay-backend/internal/persistence/db"
 )
 
+// Insert adds a running attempt row. The caller sets its ID and StartedAt.
+func Insert(ctx context.Context, q db.Querier, a domain.JobAttempt) error {
+	_, err := q.Exec(ctx, `
+		INSERT INTO job_attempts (id, job_id, attempt_number, worker_id, status, started_at)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		a.ID, a.JobID, a.AttemptNumber, a.WorkerID, string(a.Status), a.StartedAt)
+	if err != nil {
+		return fmt.Errorf("insert attempt %s of job %s: %w", a.ID, a.JobID, err)
+	}
+	return nil
+}
+
 // ListByJob returns up to limit attempts of a job ordered by attempt number,
 // starting after the number afterNumber. afterNumber 0 starts at the beginning.
 func ListByJob(ctx context.Context, q db.Querier, jobID uuid.UUID, afterNumber, limit int) ([]domain.JobAttempt, error) {
