@@ -73,6 +73,7 @@ func TestValidateRules(t *testing.T) {
 		{"zero cancel grace", map[string]string{"RELAY_CANCEL_GRACE_PERIOD": "0"}, config.RoleWorker, "RELAY_CANCEL_GRACE_PERIOD"},
 		{"zero shutdown timeout", map[string]string{"RELAY_SHUTDOWN_TIMEOUT": "0"}, config.RoleAPI, "RELAY_SHUTDOWN_TIMEOUT"},
 		{"zero payload limit", map[string]string{"RELAY_MAX_PAYLOAD_BYTES": "0"}, config.RoleAPI, "RELAY_MAX_PAYLOAD_BYTES"},
+		{"zero result limit", map[string]string{"RELAY_MAX_RESULT_BYTES": "0"}, config.RoleWorker, "RELAY_MAX_RESULT_BYTES"},
 		{"bad log level", map[string]string{"RELAY_LOG_LEVEL": "loud"}, config.RoleAPI, "RELAY_LOG_LEVEL"},
 		{"queues only commas", map[string]string{"RELAY_WORKER_QUEUES": " , ,"}, config.RoleWorker, "RELAY_WORKER_QUEUES"},
 	}
