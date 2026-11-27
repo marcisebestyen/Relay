@@ -74,6 +74,8 @@ type Shutdown struct {
 // Limits holds request and payload limits.
 type Limits struct {
 	MaxPayloadBytes int64
+	// MaxResultBytes caps a handler result. Larger results are dropped, not stored.
+	MaxResultBytes int64
 }
 
 // Telemetry holds logging settings. Exporters are added by later tickets.
@@ -111,6 +113,7 @@ var specs = []spec{
 	duration("RELAY_CANCEL_GRACE_PERIOD", "30s", func(c *Config) *time.Duration { return &c.Timeouts.CancelGracePeriod }),
 	duration("RELAY_SHUTDOWN_TIMEOUT", "30s", func(c *Config) *time.Duration { return &c.Shutdown.Timeout }),
 	number("RELAY_MAX_PAYLOAD_BYTES", "262144", func(c *Config) *int64 { return &c.Limits.MaxPayloadBytes }),
+	number("RELAY_MAX_RESULT_BYTES", "65536", func(c *Config) *int64 { return &c.Limits.MaxResultBytes }),
 	text("RELAY_LOG_LEVEL", "info", func(c *Config) *string { return &c.Telemetry.LogLevel }),
 }
 

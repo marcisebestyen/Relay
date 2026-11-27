@@ -35,6 +35,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		"cancel grace":  cfg.Timeouts.CancelGracePeriod == 30*time.Second,
 		"shutdown":      cfg.Shutdown.Timeout == 30*time.Second,
 		"payload bytes": cfg.Limits.MaxPayloadBytes == 262144,
+		"result bytes":  cfg.Limits.MaxResultBytes == 65536,
 		"log level":     cfg.Telemetry.LogLevel == "info",
 		"db url empty":  cfg.Database.URL == "",
 	}
@@ -54,10 +55,14 @@ func TestLoadAppliesOverrides(t *testing.T) {
 		"RELAY_WORKER_CONCURRENCY": "8",
 		"RELAY_LEASE_DURATION":     "1m",
 		"RELAY_MAX_PAYLOAD_BYTES":  "1024",
+		"RELAY_MAX_RESULT_BYTES":   "2048",
 		"RELAY_LOG_LEVEL":          "debug",
 	}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Limits.MaxResultBytes != 2048 {
+		t.Errorf("MaxResultBytes = %d, want 2048", cfg.Limits.MaxResultBytes)
 	}
 	if cfg.Database.URL != "postgres://x" || cfg.HTTP.Addr != ":9000" || cfg.Auth.Token != "tok" {
 		t.Errorf("string overrides not applied: %+v", cfg)
