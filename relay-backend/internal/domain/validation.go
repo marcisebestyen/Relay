@@ -57,6 +57,14 @@ func validateHandler(handler string) (string, bool) {
 	return "", true
 }
 
+// ValidateHandlerID checks a handler identifier against the domain rule.
+func ValidateHandlerID(id string) error {
+	if msg, ok := validateHandler(id); !ok {
+		return ValidationErrors{"handler": msg}
+	}
+	return nil
+}
+
 func validateQueue(queue string) (string, bool) {
 	if !queuePattern.MatchString(queue) {
 		return "must match ^[a-z0-9][a-z0-9._-]{0,62}$", false
